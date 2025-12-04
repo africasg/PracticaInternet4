@@ -3,7 +3,7 @@ import { gql } from "apollo-server"
 export const typeDefs = gql`
      
     type User{
-        id: ID!,
+        _id: ID!,
         username:String! 
         email:String!,
         password: String!,
@@ -16,7 +16,7 @@ export const typeDefs = gql`
         startDate: String!,
         endDate: String!, 
         owner: ID,
-        members: [User!],
+        members: [User!]!,
         tasks: [Tasks]
     },
     type AuthPayload{
@@ -43,7 +43,7 @@ export const typeDefs = gql`
     type Mutation {
         register(email: String!, password: String!): AuthPayload!
         login(email: String!, password: String!): AuthPayload!
-        createProject(name: String!, startDate: String!, endDate: String! , members: [User]): Project!
+        createProject(name: String!, description:String, startDate: String!, endDate: String! , members: [User]): Project!
         updateProject(id:ID!, name: String, description:String ,startDate: String, endDate: String, members:[User]): Project
         addMember(projectId:ID!, userID:ID!): Project
         createTask(projectId:ID!,title:String!,status:String, priority:String!, dueDate: String!): Tasks!
