@@ -13,13 +13,14 @@ const collectionUsers = "users";
 
 export const resolvers: IResolvers = {
     Query: {
-    me : async (__,_, {user})=>{//en el parentesis se pone (gql,argumentos,contexto); en la parte donde pone user, se puede poner ctx.user
+    me : async (__,_, {user})=>{
      if(!user)  throw new Error ("No tienes credenciales");
      return {id:user._id.toString(),
             ...user}
     },
     myProjects: async(_,__,{user})=>{
         if(!user) throw new Error ("No tienes credenciales");
+        const db = getDB();
         return await db.collection(collectionProjects).find().toArray();
     },
     projectDetails : async(_,{projectId}:{projectId:string},{user})=>{
@@ -32,15 +33,21 @@ export const resolvers: IResolvers = {
         const db = getDB();
         return await db.collection(collectionUsers).find().toArray();
     },
-    Project:{
-        tasks:(parent:Projects)=>{
-            /// Buscar en la coleccion de Task que tareas tienen como projectId el valor de parent._id
-        }
-    }
+    },
+   Projects: {
+    tasks: async (parent: Projects) => {
+        const db = getDB();
+        return await db.collection<Tasks>(collectionTasks).find({projectId: parent._id}).toArray();
+    },
+    members :async(parent: Projects) => {
+        const db = getDB();
+        return await db.collection<Users>(collectionUsers).find({$in: {_id:parent.members}}).toArray();
+    },
+    
     },
     Mutation:{
-        register: async(_,{email,password}: {email:string, password:string})=>{
-            const userId = await createUser(email,password)
+        register: async(_,{email,password,username}: {email:string, password:string,username:string})=>{
+            const userId = await createUser(email,password,username)
             const token =  signToken(userId);
             const payload  : AuthPayload={
                 token
@@ -49,7 +56,7 @@ export const resolvers: IResolvers = {
         },
         login: async(_,{email,password}: {email:string, password:string})=>{
             const user = await validateUser(email,password)
-            if(!user) throw new Error ("Esos credenciales no son correctos mi vida");
+            if(!user) throw new Error ("Esos credenciales no son correctos");
              const token =  signToken(user._id.toString());
               const payload  : AuthPayload={
                 token
@@ -67,7 +74,8 @@ export const resolvers: IResolvers = {
                 members,
                 owner : user._id
              }
-            return await db.collection<Projects>(collectionProjects).insertOne(nuevoProject);
+            const a =  await db.collection<Projects>(collectionProjects).insertOne(nuevoProject);
+            return await db.collection<Projects>(collectionProjects).findOne({_id:a.insertedId})
         },
         updateProject: async (__,{id,name,description,startDate,endDate,members},{user})=>{
             if(!user)  throw new Error ("No tienes credenciales");
@@ -98,18 +106,20 @@ export const resolvers: IResolvers = {
         createTask : async(_,{title,projectId,status,priority,dueDate,assignedTo},{user})=>{
             if (!user)  throw new Error ("No tienes credenciales");
             const db = getDB();
-            const project = await db.collection<Projects>(collectionProjects).findOne({_id:projectId})
+            const project = await db.collection<Projects>(collectionProjects).findOne({ _id: new ObjectId(projectId) })
                  if(!project) throw new Error ("no existe el proyecto");
-                const esMiembro = project.members?.some((n)=>user._id===n);
-              if ((project.owner !== user._id) && (!esMiembro){
-                throw new Error ("No eres el owner ni miembro ")
-              }
-            if(status !== "PENDING "||status !== "IN PROGRESS "||status !== "COMPLETED"){
-                status="PENDING"
-            }
-            if(priority!== "LOW"||priority!== "HIGH"||priority!== "MEDIUM"){
-                throw new Error ("Prio incorrecta")
-            }
+                const esOwner = project.owner.toString() === user._id.toString();
+                const esMiembro = project.members?.some( (id) => id.toString() === user._id.toString()
+                );
+            if (!esOwner && !esMiembro) {throw new Error("No eres el owner ni miembro")}
+            
+            if (status !== "PENDING" && status !== "IN PROGRESS" && status !== "COMPLETED") {
+            status = "PENDING";}
+
+            if (priority !== "LOW" && priority !== "HIGH" && priority !== "MEDIUM") {
+                throw new Error("Prio incorrecta");
+                    }
+
             const newTask : Tasks ={
                 
                 title, 
@@ -120,7 +130,8 @@ export const resolvers: IResolvers = {
                 assignedTo
 
             }
-            await db.collection(collectionTasks).insertOne(newTask);
+            const a = await db.collection(collectionTasks).insertOne(newTask);
+            return await db.collection(collectionTasks).findOne({_id: a.insertedId})
         },
         updateTaskStatus : async (__, {taskId, taskStatus},{user})=>{
             if (!user)  throw new Error ("No tienes credenciales");
@@ -131,5 +142,17 @@ export const resolvers: IResolvers = {
                 taskStatus="PENDING"
             }
             return await db.collection(collectionTasks).updateOne({_id:taskId},{$set: {status:taskStatus}})
-        }
+        },
+        deleteProject: async(_,{id},{user})=>{
+            if (!user)  throw new Error ("No tienes credenciales");
+            const db = getDB();
+             let project = await db.collection<Projects>(collectionProjects).findOne({_id:id});
+             if(!project) throw new Error ("No existe ese proyecto ");
+             if(project.owner !== user._id) throw new Error ("No eres el owner");
+
+             await db.collection(collectionProjects).deleteOne({_id:id});
+             await db.collection<Tasks>(collectionTasks).deleteMany({projectId:id});
+             return project;
+            }
     }
+}

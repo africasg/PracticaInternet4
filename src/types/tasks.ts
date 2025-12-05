@@ -5,7 +5,7 @@ export type Tasks ={
 title: string
 projectId: ObjectId, 
 assignedTo?: ObjectId, 
-status: "PENDING" | "IN_PROGRESS" | "COMPLETED",// default PENDING.
-priority: "LOW"|"MEDIUM"| "HIGH",
+status: string,
+priority: string,
 dueDate: Date
 }

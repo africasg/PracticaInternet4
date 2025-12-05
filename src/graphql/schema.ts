@@ -4,7 +4,7 @@ export const typeDefs = gql`
      
     type User{
         _id: ID!,
-        username:String! 
+        username:String! ,
         email:String!,
         password: String!,
         createdAt: String
@@ -16,7 +16,7 @@ export const typeDefs = gql`
         startDate: String!,
         endDate: String!, 
         owner: ID,
-        members: [User!]!,
+        members: [ID!]!,
         tasks: [Tasks]
     },
     type AuthPayload{
@@ -36,18 +36,18 @@ export const typeDefs = gql`
      type Query {
         me:User
         myProjects:[Projects!],
-        projectDetails (projectId: ID!): Project
+        projectDetails (projectId: ID!): Projects
         users: [User!]!
     }
 
     type Mutation {
-        register(email: String!, password: String!): AuthPayload!
+        register(email: String!, password: String!,username:String!): AuthPayload!
         login(email: String!, password: String!): AuthPayload!
-        createProject(name: String!, description:String, startDate: String!, endDate: String! , members: [User]): Project!
-        updateProject(id:ID!, name: String, description:String ,startDate: String, endDate: String, members:[User]): Project
-        addMember(projectId:ID!, userID:ID!): Project
+        createProject(name: String!, description:String, startDate: String!, endDate: String! , members: [ID]): Projects!
+        updateProject(id:ID!, name: String, description:String ,startDate: String, endDate: String, members:[ID]): Projects
+        addMember(projectId:ID!, userID:ID!): Projects
         createTask(projectId:ID!,title:String!,status:String, priority:String!, dueDate: String!): Tasks!
         updateTaskStatus(taskId: ID!, taskStatus: String!) : Tasks
-        deleteProject(id:ID!): Project
+        deleteProject(id:ID!): Projects
     }
     `

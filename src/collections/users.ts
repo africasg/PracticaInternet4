@@ -4,14 +4,17 @@ import bcrypt from "bcryptjs"
 
 const coleccionUsers = "users"
 
-export const createUser =  async (email:string, password:string)=>{
+export const createUser =  async (email:string, password:string,username:string)=>{
     const db = getDB();
     const noTeLaSabesJAJA = await bcrypt.hash(password,10);
 
 
     const result = await db.collection(coleccionUsers).insertOne({
         email,
-        password: noTeLaSabesJAJA
+        password: noTeLaSabesJAJA,
+        createdAt: Date.now(),
+        username
+
     });
     return result.insertedId.toString()
 }
