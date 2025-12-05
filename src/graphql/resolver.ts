@@ -37,13 +37,19 @@ export const resolvers: IResolvers = {
    Projects: {
     tasks: async (parent: Projects) => {
         const db = getDB();
-        return await db.collection<Tasks>(collectionTasks).find({projectId: parent._id}).toArray();
+        return await db.collection<Tasks>(collectionTasks).find({projectId: parent._id?.toString()}).toArray();
     },
-    members :async(parent: Projects) => {
-        const db = getDB();
-        return await db.collection<Users>(collectionUsers).find({$in: {_id:parent.members}}).toArray();
-    },
-    
+    members: async (parent: Projects) => {
+    const db = getDB();
+    if (!parent.members || parent.members.length === 0) {
+        return [];
+    }
+    const ids = parent.members.map((id) =>
+        id instanceof ObjectId ? id : new ObjectId(id)
+    );
+    return await db.collection<Users>(collectionUsers).find({ _id: { $in: ids } }).toArray();
+        },
+
     },
     Mutation:{
         register: async(_,{email,password,username}: {email:string, password:string,username:string})=>{
@@ -66,37 +72,42 @@ export const resolvers: IResolvers = {
         createProject: async(__,{name,description,startDate,endDate,members},{user})=>{
              if(!user)  throw new Error ("No tienes credenciales");
              const db = getDB();
-             const nuevoProject : Projects ={
-                name, 
-                description,
-                startDate,
-                endDate,
-                members,
-                owner : user._id
-             }
+           const nuevoProject: Projects = {
+            name,
+            description,
+            startDate,
+            endDate,
+            owner: new ObjectId(user._id),
+            members
+        };
             const a =  await db.collection<Projects>(collectionProjects).insertOne(nuevoProject);
             return await db.collection<Projects>(collectionProjects).findOne({_id:a.insertedId})
         },
         updateProject: async (__,{id,name,description,startDate,endDate,members},{user})=>{
             if(!user)  throw new Error ("No tienes credenciales");
              const db = getDB();
-             let project = await db.collection<Projects>(collectionProjects).findOne({_id:id});
+             let project = await db.collection<Projects>(collectionProjects).findOne({_id: new ObjectId(id) });
              if(!project) throw new Error ("No existe ese proyecto ");
-             if(project.owner !== user._id) throw new Error ("No eres el owner");
-            const updates : any = {}
-            if (description) updates.description=description;
-            if(members) updates.members=members;
-            updates.name=name;
-            updates.startDate=startDate;
-            updates.endDate = endDate;
-             return await db.collection(collectionProjects).updateOne({_id:id},{$set: {updates}});
+             if(project.owner.toString() !== user._id.toString()) throw new Error ("No eres el owner");
+
+             if(!description) description = project.description;
+            if(!members) members = project.members;
+               if(!name) name = project.name;
+              if(!startDate) startDate = project.startDate;
+              if(!endDate) endDate = project.endDate;
+             
+            
+              await db.collection<Projects>(collectionProjects).updateOne({_id:new ObjectId(id)},{$set:{
+                name,startDate,endDate,description,members
+              }});
+             return await db.collection(collectionProjects).findOne({_id:new ObjectId(id)});
         },
         addMember: async (__,{projectId,userId},{user})=>{
-                if (!user)  throw new Error ("No tienes credenciales");
+                if (!user) throw new Error ("No tienes credenciales");
                  const db = getDB();
-                 const project = await db.collection<Projects>(collectionProjects).findOne({_id:projectId})
+                 const project = await db.collection<Projects>(collectionProjects).findOne({_id: new ObjectId(projectId)})
                  if(!project) throw new Error ("no existe el proyecto");
-                 if (project.owner !== user._id) throw new Error ("No eres el owner")
+                 if (project.owner.toString() !== user._id.toString()) throw new Error ("No eres el owner")
                  project.members?.push(new ObjectId(userId));
                 await db.collection(collectionProjects).updateOne({_id:projectId},{ $set:{project}})
                 return {
@@ -133,26 +144,39 @@ export const resolvers: IResolvers = {
             const a = await db.collection(collectionTasks).insertOne(newTask);
             return await db.collection(collectionTasks).findOne({_id: a.insertedId})
         },
-        updateTaskStatus : async (__, {taskId, taskStatus},{user})=>{
-            if (!user)  throw new Error ("No tienes credenciales");
+       updateTaskStatus: async (_, { taskId, taskStatus }, { user }) => {
+            if (!user) throw new Error("No tienes credenciales");
             const db = getDB();
-            const taskChange = await db.collection(collectionTasks).findOne({_id:taskId})
-            if(!taskChange) throw new Error ("No existe este task");
-            if(taskStatus !== "PENDING "||taskStatus !== "IN PROGRESS "||taskStatus !== "COMPLETED"){
-                taskStatus="PENDING"
-            }
-            return await db.collection(collectionTasks).updateOne({_id:taskId},{$set: {status:taskStatus}})
-        },
-        deleteProject: async(_,{id},{user})=>{
-            if (!user)  throw new Error ("No tienes credenciales");
-            const db = getDB();
-             let project = await db.collection<Projects>(collectionProjects).findOne({_id:id});
-             if(!project) throw new Error ("No existe ese proyecto ");
-             if(project.owner !== user._id) throw new Error ("No eres el owner");
+            const objectId = new ObjectId(taskId);
 
-             await db.collection(collectionProjects).deleteOne({_id:id});
-             await db.collection<Tasks>(collectionTasks).deleteMany({projectId:id});
-             return project;
-            }
+        const taskChange = await db.collection(collectionTasks).findOne({ _id: objectId });
+    if (!taskChange) throw new Error("No existe este task");
+    if (taskStatus !== "PENDING" && taskStatus !== "IN PROGRESS" && taskStatus !== "COMPLETED") {
+        taskStatus = "PENDING"; }
+
+    await db.collection(collectionTasks).updateOne(
+        { _id: objectId },
+        { $set: { status: taskStatus } }
+    );
+
+    const updatedTask = await db.collection(collectionTasks).findOne({ _id: objectId });
+
+    return {
+        ...updatedTask,
+        _id: updatedTask?._id.toString()
+    };
+},
+
+        deleteProject: async(_, {id}, {user}) =>{
+            if(!user) throw new Error("No tienes credenciales correctas");
+            const db = getDB();
+            let proyecto = await db.collection<Projects>(collectionProjects).findOne({_id: new ObjectId(id)});
+            if(!proyecto) throw new Error("No existe el proyecto")
+            if(proyecto.owner.toString() !== user._id.toString()) throw new Error("No eres el owner del proyecto")
+
+            await db.collection(collectionProjects).deleteOne({_id: new ObjectId(id)});
+            await db.collection(collectionTasks).deleteMany({projectId: new ObjectId(id)});
+            return proyecto;
+        }
     }
 }

@@ -16,7 +16,7 @@ export const typeDefs = gql`
         startDate: String!,
         endDate: String!, 
         owner: ID,
-        members: [ID!]!,
+        members: [User!]!,
         tasks: [Tasks]
     },
     type AuthPayload{
