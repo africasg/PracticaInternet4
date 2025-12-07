@@ -1,7 +1,7 @@
 import {Db, MongoClient} from "mongodb";
 import dotenv from "dotenv";
 
-dotenv.config(); //inicialización 
+dotenv.config(); 
 
 let client : MongoClient
 let db : Db
@@ -17,8 +17,8 @@ export const connectToMongoDb = async (): Promise<void>=>{
 
     } catch(error){
         console.error("Error al conectar a Mongo");
-        process.exit(1); //mata el proceso y que ese hilo deje de ejecutar
+        process.exit(1); 
     }
   
 } 
-export const getDB=(): Db => db; //no acceder a esto antes de haberte conectado
+export const getDB=(): Db => db; 

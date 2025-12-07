@@ -21,7 +21,12 @@ export const resolvers: IResolvers = {
     myProjects: async(_,__,{user})=>{
         if(!user) throw new Error ("No tienes credenciales");
         const db = getDB();
-        return await db.collection(collectionProjects).find().toArray();
+        return await db.collection(collectionProjects).find({
+            $or:[
+            {owner:new ObjectId(user._id)},
+            {members: new ObjectId(user._id)}        
+            ]
+        });
     },
     projectDetails : async(_,{projectId}:{projectId:string},{user})=>{
         if(!user) throw new Error ("No tienes credenciales");;
@@ -72,6 +77,7 @@ export const resolvers: IResolvers = {
         createProject: async(__,{name,description,startDate,endDate,members},{user})=>{
              if(!user)  throw new Error ("No tienes credenciales");
              const db = getDB();
+             if(endDate < startDate)throw new Error("El proyecto no puede finalizar antes de empezar")
            const nuevoProject: Projects = {
             name,
             description,
@@ -109,7 +115,7 @@ export const resolvers: IResolvers = {
                  if(!project) throw new Error ("no existe el proyecto");
                  if (project.owner.toString() !== user._id.toString()) throw new Error ("No eres el owner")
                  project.members?.push(new ObjectId(userId));
-                await db.collection(collectionProjects).updateOne({_id:projectId},{ $set:{project}})
+                await db.collection(collectionProjects).updateOne({_id:new ObjectId(projectId)},{ $set:{members:project.members}})
                 return {
                     ...project
                 }
@@ -175,7 +181,7 @@ export const resolvers: IResolvers = {
             if(proyecto.owner.toString() !== user._id.toString()) throw new Error("No eres el owner del proyecto")
 
             await db.collection(collectionProjects).deleteOne({_id: new ObjectId(id)});
-            await db.collection(collectionTasks).deleteMany({projectId: new ObjectId(id)});
+            await db.collection(collectionTasks).deleteMany({projectId: id});
             return proyecto;
         }
     }
